@@ -8,8 +8,8 @@ if (typeof importScripts === 'function') {
 }
 
 // from 'utils.js'
-/*   global isNotExcludedUrl, getCleanUrl, isArchiveUrl, isValidUrl, notifyMsg, openByWindowSetting, sleep, wmAvailabilityCheck, hostURL */
-/*   global initDefaultOptions, badgeCountText, getWaybackCount, newshosts, dateToTimestamp, fixedEncodeURIComponent, checkLastError */
+/*   global isNotExcludedUrl, getCleanUrl, isArchiveUrl, stripArchivePrefix, isValidUrl, notifyMsg, openByWindowSetting, sleep, wmAvailabilityCheck */
+/*   global hostURL, initDefaultOptions, badgeCountText, getWaybackCount, newshosts, dateToTimestamp, fixedEncodeURIComponent, checkLastError */
 /*   global hostHeaders, timestampToDate, isBadgeOnTop, isUrlInList, saveTabData, clearTabData, readTabData, initAutoExcludeList */
 /*   global isDevVersion, checkAuthentication, setupContextMenus, cropPrefix, alertMsg */
 
@@ -682,7 +682,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
 chrome.tabs.onUpdated.addListener(async (tabId, info, tab) => {
   const url = tab.url
-  if (!(isNotExcludedUrl(url) && isValidUrl(url)) || isArchiveUrl(url)) { return }
+  if (!(isNotExcludedUrl(url) && isValidUrl(url)) || !stripArchivePrefix(url)) { return }
 
   if (info.status === 'complete') {
     updateWaybackCountBadge(tab, url)
@@ -737,7 +737,7 @@ chrome.tabs.onUpdated.addListener(async (tabId, info, tab) => {
     let received_url = url
     await clearToolbarState(tab)
 
-    if (received_url && !isArchiveUrl(received_url)) {
+    if (received_url && stripArchivePrefix(received_url)) {
       let open_url = received_url.replace(/^https?:\/\//, '')
       if (open_url.slice(-1) === '/') { open_url = received_url.substring(0, open_url.length - 1) }
 
@@ -1071,7 +1071,7 @@ function incrementCount(url) {
 function updateWaybackCountBadge(atab, url) {
   if (!atab) { return }
   chrome.storage.local.get(['wm_count_setting'], (settings) => {
-    if (settings?.wm_count_setting && isValidUrl(url) && isNotExcludedUrl(url) && !isArchiveUrl(url)) {
+    if (settings?.wm_count_setting && isValidUrl(url) && isNotExcludedUrl(url) && stripArchivePrefix(url)) {
       getCachedWaybackCount(url, async(values) => {
         let tbStates = await getToolbarState(atab);
         if ((values.total >= 0) && !tbStates.has('S')) {

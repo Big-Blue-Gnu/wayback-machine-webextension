@@ -399,6 +399,23 @@ function isArchiveUrl(url) {
 }
 
 /**
+ * Returns the URL without the archive prefix.
+ * @param url {string}
+ * @return {bool}
+ */
+function stripArchivePrefix(url) {
+  if (isArchiveUrl(url)) {
+    try {
+      url = url.replace("^https?://web.archive.org/web/\d+\d{10}(?:_im)?/", "")
+    } catch (e) {
+      // cannot fetch the original url
+      return false
+    }
+  }
+  return true
+}
+
+/**
  * Makes sure response is a valid URL to prevent code injection
  * @param url {string}
  * @return {bool}
@@ -855,6 +872,7 @@ if (typeof module !== 'undefined') {
     getUrlByParameter,
     getWaybackUrlFromResponse,
     isArchiveUrl,
+    stripArchivePrefix,
     isValidUrl,
     isUrlInList,
     matchWildcard,
