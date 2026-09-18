@@ -3,6 +3,7 @@ const expect = require('chai').expect
 const assert = require('assert').strict
 const getUrlByParameter = require('../webextension/scripts/utils').getUrlByParameter
 const isArchiveUrl = require('../webextension/scripts/utils').isArchiveUrl
+const stripArchivePrefix = require('../webextension/scripts/utils').stripArchivePrefix
 const isValidUrl = require('../webextension/scripts/utils').isValidUrl
 const getCleanUrl = require('../webextension/scripts/utils').getCleanUrl
 const isNotExcludedUrl = require('../webextension/scripts/utils').isNotExcludedUrl
@@ -43,6 +44,23 @@ describe('isArchiveUrl', () => {
   })
   it('should reject non-strings', () => {
     let result = isArchiveUrl(5) || isArchiveUrl({}) || isArchiveUrl(true)
+    expect(result).to.be.false
+  })
+})
+
+describe('stripArchivePrefix', () => {
+  var test_cases = [
+    { 'url': 'http://web.archive.org/', 'result': true },
+    { 'url': 'https://web.archive.org/web/2001110921/', 'result': false },
+    { 'url': 'https://web.archive.org/web/20011109210236/http://web.archive.org/', 'result': true }
+  ]
+  test_cases.forEach(({ url, result }) => {
+    it('should return ' + result + ' on ' + url, () => {
+      expect(stripArchivePrefix(url)).to.equal(result)
+    })
+  })
+  it('should reject non-strings', () => {
+    let result = stripArchivePrefix(5) || stripArchivePrefix({}) || stripArchivePrefix(true)
     expect(result).to.be.false
   })
 })
