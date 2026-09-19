@@ -1,8 +1,8 @@
 // popup.js
 
 // from 'utils.js'
-/*   global stripArchivePrefix, isValidUrl, makeValidURL, isNotExcludedUrl, getCleanUrl, openByWindowSetting, hostURL */
-/*   global feedbackURL, newshosts, dateToTimestamp, timestampToDate, viewableTimestamp, fixedEncodeURIComponent */
+/*   global isArchiveUrl, stripArchivePrefix, isValidUrl, makeValidURL, isNotExcludedUrl, getCleanUrl, openByWindowSetting */
+/*   global hostURL, feedbackURL, newshosts, dateToTimestamp, timestampToDate, viewableTimestamp, fixedEncodeURIComponent */
 /*   global attachTooltip, checkLastError, cropPrefix, cropScheme, hostHeaders, getUserInfo, checkAuthentication */
 
 let searchBoxTimer
@@ -68,7 +68,7 @@ function initActiveTabURL() {
   chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
     if (tabs && tabs[0]) {
       activeTab = tabs[0]
-      activeURL = tabs[0].url
+      activeURL = stripArchivePrefix(tabs[0].url)
       setupSaveAction(activeURL)
     }
   })
@@ -125,7 +125,7 @@ function spnSystemStatus() {
 
 function doSaveNow() {
   const url = activeURL
-  if (url && isValidUrl(url) && isNotExcludedUrl(url) && stripArchivePrefix(url)) {
+  if (url && isValidUrl(url) && isNotExcludedUrl(url) && !isArchiveUrl(url)) {
     let options = { 'capture_all': 1 }
     if ($('#chk-outlinks').prop('checked') === true) {
       options['capture_outlinks'] = 1
@@ -166,7 +166,7 @@ function setupLoginState() {
 
 // Sets up the SPN button click event and Last Saved text.
 function setupSaveAction(url) {
-  if (!url || !isValidUrl(url) || !isNotExcludedUrl(url) || !stripArchivePrefix(url)) {
+  if (!url || !isValidUrl(url) || !isNotExcludedUrl(url) || isArchiveUrl(url)) {
     return showUrlNotSupported(true)
   }
 
@@ -343,7 +343,7 @@ function useSearchURL(flag) {
     $('#using-search-msg').hide()
     // reassign activeURL
     chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-      activeURL = (tabs?.[0]) ? tabs[0].url : null
+      activeURL = (tabs?.[0]) ? stripArchivePrefix(tabs[0].url) : null
     })
   }
 }
@@ -354,8 +354,8 @@ function setupSearchBox() {
   search_box.addEventListener('keyup', (e) => {
     // exclude UP and DOWN keys from keyup event
     if (!((e.key === 'ArrowUp') || (e.key === 'ArrowDown')) && (search_box.value.length >= 0)) {
-      const url = makeValidURL(search_box.value)
-      if (url && isNotExcludedUrl(url) && stripArchivePrefix(url)) {
+      const url = makeValidURL(stripArchivePrefix(search_box.value))
+      if (url && isNotExcludedUrl(url) && !isArchiveUrl(url)) {
         activeURL = url
         useSearchURL(true)
       } else {
@@ -539,7 +539,7 @@ function setupViewArchived() {
         checkLastError()
         const state = new Set(result?.stateArray ?? []);
         if (state.has('V') && result?.customData?.statusWaybackUrl && result.customData?.statusCode >= 400 &&
-          result.customData?.statusUrl && (cropPrefix(result.customData.statusUrl) === cropPrefix(tabs[0].url)))
+          result.customData?.statusUrl && (cropPrefix(result.customData.statusUrl) === cropPrefix(stripArchivePrefix(tabs[0].url))))
         {
           // show msg and View Archived button for error status codes
           const statusCode = result.customData.statusCode
@@ -563,7 +563,7 @@ function setupViewArchived() {
 function setupReadBook() {
   chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
     if (tabs?.[0]) {
-      const url = tabs[0].url
+      const url = stripArchivePrefix(tabs[0].url)
       if (url.includes('www.amazon') && url.includes('/dp/')) {
         chrome.runtime.sendMessage({ message: 'getToolbarState', atab: tabs[0] }, (result) => {
           checkLastError()
@@ -611,7 +611,7 @@ function setupReadBook() {
 function setupNewsClips() {
   chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
     if (tabs?.[0]) {
-      const url = tabs[0].url
+      const url = stripArchivePrefix(tabs[0].url)
       const news_host = new URL(url).hostname
       if (newshosts.has(news_host)) {
         chrome.runtime.sendMessage({ message: 'getToolbarState', atab: tabs[0] }, (result) => {
@@ -640,7 +640,7 @@ function setupNewsClips() {
 function setupWikiButtons() {
   chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
     if (tabs?.[0]) {
-      const url = tabs[0].url
+      const url = stripArchivePrefix(tabs[0].url)
       if (url.match(/^https?:\/\/[\w.]*wikipedia.org/)) {
         chrome.runtime.sendMessage({ message: 'getToolbarState', atab: tabs[0] }, (result) => {
           checkLastError()
@@ -742,8 +742,8 @@ function setupWaybackCount() {
     chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
       if (tabs?.[0]) {
         // not using activeURL as we don't want wayback count on search url
-        const url = tabs[0].url
-        if (url && settings?.wm_count_setting && isValidUrl(url) && isNotExcludedUrl(url) && stripArchivePrefix(url)) {
+        const url = stripArchivePrefix(tabs[0].url)
+        if (url && settings?.wm_count_setting && isValidUrl(url) && isNotExcludedUrl(url) && !isArchiveUrl(url)) {
           showWaybackCount(url)
           chrome.runtime.sendMessage({ message: 'updateCountBadge' })
         } else {

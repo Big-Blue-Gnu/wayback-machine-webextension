@@ -306,7 +306,7 @@ function fetchAPI(url, onSuccess, onFail, postData = null) {
     let headers = new Headers(hostHeaders)
     headers.set('backend', 'nomad')
     headers.set('Content-Type', 'application/json')
-    fetch(url, {
+    fetch(stripArchivePrefix(url), {
       method: (postData) ? 'POST' : 'GET',
       body: (postData) ? JSON.stringify(postData) : null,
       headers
@@ -341,7 +341,7 @@ function fetchCachedAPI(url, onSuccess, onFail, postData = null) {
   if (data === API_LOADING) {
     // re-call after delay if previous fetch hadn't returned yet
     setTimeout(() => {
-      fetchCachedAPI(url, onSuccess, onFail, postData)
+      fetchCachedAPI(stripArchivePrefix(url), onSuccess, onFail, postData)
     }, API_RETRY)
     return null
   } else if (data !== undefined) {
@@ -352,12 +352,12 @@ function fetchCachedAPI(url, onSuccess, onFail, postData = null) {
     if (globalAPICache.size >= API_CACHE_SIZE) {
       globalAPICache.delete(globalAPICache.keys().next().value)
     }
-    globalAPICache.set(url, API_LOADING)
+    globalAPICache.set(stripArchivePrefix(url), API_LOADING)
     return fetchAPI(url, (json) => {
-      globalAPICache.set(url, json)
+      globalAPICache.set(stripArchivePrefix(url), json)
       onSuccess(json)
     }, (error) => {
-      globalAPICache.delete(url)
+      globalAPICache.delete(stripArchivePrefix(url))
       onFail(error)
     }, postData)
   }
@@ -371,7 +371,7 @@ function fetchCachedAPI(url, onSuccess, onFail, postData = null) {
  * @param isbns: (optional) array of isbn strings.
  */
 function getCachedBooks(url, onSuccess, onFail, isbns = null) {
-  const requestUrl = hostURL + 'services/context/books?url=' + fixedEncodeURIComponent(url)
+  const requestUrl = hostURL + 'services/context/books?url=' + fixedEncodeURIComponent(stripArchivePrefix(url))
   if (isbns) {
     fetchCachedAPI(requestUrl, onSuccess, onFail, { isbns })
   } else {
@@ -380,17 +380,17 @@ function getCachedBooks(url, onSuccess, onFail, isbns = null) {
 }
 
 function getCachedPapers(url, onSuccess, onFail) {
-  const requestUrl = hostURL + 'services/context/papers?url=' + fixedEncodeURIComponent(url)
+  const requestUrl = hostURL + 'services/context/papers?url=' + fixedEncodeURIComponent(stripArchivePrefix(url))
   fetchCachedAPI(requestUrl, onSuccess, onFail)
 }
 
 function getCachedTvNews(url, onSuccess, onFail) {
-  const requestUrl = hostURL + 'services/context/tvnews?url=' + fixedEncodeURIComponent(url)
+  const requestUrl = hostURL + 'services/context/tvnews?url=' + fixedEncodeURIComponent(stripArchivePrefix(url))
   fetchCachedAPI(requestUrl, onSuccess, onFail)
 }
 
 function getCachedFactCheck(url, onSuccess, onFail) {
-  const requestUrl = hostURL + 'services/context/notices?url=' + fixedEncodeURIComponent(url)
+  const requestUrl = hostURL + 'services/context/notices?url=' + fixedEncodeURIComponent(stripArchivePrefix(url))
   fetchCachedAPI(requestUrl, onSuccess, onFail)
 }
 
@@ -445,7 +445,7 @@ chrome.webRequest.onErrorOccurred.addListener((details) => {
   if ((['net::ERR_ABORTED', 'net::ERR_NAME_NOT_RESOLVED', 'net::ERR_NAME_RESOLUTION_FAILED',
     'net::ERR_CONNECTION_TIMED_OUT', 'net::ERR_NAME_NOT_RESOLVED', 'NS_ERROR_UNKNOWN_HOST'].indexOf(details.error) >= 0) && (details.tabId >= 0) && (details.parentFrameId < 1)) {
     // note: testing parentFrameId prevents false positives
-    const url = details.url
+    const url = stripArchivePrefix(details.url)
     if (isNotExcludedUrl(url) && isValidUrl(url)) {
       chrome.tabs.get(details.tabId, async (tab) => {
         // TODO FIXME: There's a bug causing normal pages to store status 999 and display a red dot.
@@ -458,7 +458,7 @@ chrome.webRequest.onErrorOccurred.addListener((details) => {
 // Listens for website loading completed for 404-Not-Found popups.
 //
 chrome.webRequest.onCompleted.addListener((details) => {
-  const url = details.url
+  const url = stripArchivePrefix(details.url)
 
   // checking statusCode >= 400 here or else tab data may be overwritten with status 200 URLs.
   // another solution may be to forget using tab ids and use URLs for the key in saveTabData()
@@ -508,10 +508,10 @@ function checkNotFound(details) {
           target: { tabId: tab.id },
           files: ['/scripts/archive.js']
         }).then(() => {
-          update(tab, url, wayback_url, details2.statusCode, bannerFlag)
+          update(tab, stripArchivePrefix(url), wayback_url, details2.statusCode, bannerFlag)
         })
       } else {
-        update(tab, url, wayback_url, details2.statusCode, bannerFlag)
+        update(tab, stripArchivePrefix(url), wayback_url, details2.statusCode, bannerFlag)
       }
     })
   }
@@ -531,7 +531,7 @@ function checkNotFound(details) {
 function checkSaveToMyWebArchive(url, timestamp) {
   chrome.storage.local.get(['my_archive_setting'], (settings) => {
     if (settings?.my_archive_setting) {
-      saveToMyWebArchive(url, timestamp)
+      saveToMyWebArchive(stripArchivePrefix(url), timestamp)
       .then(response => response.json())
       .then(data => {
         if (!data?.success) {
@@ -614,7 +614,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     // States will fail to show if tab is loading but not in focus!
     // Content scripts cannot use tabs.query and send the tab, so it must be called here.
     chrome.tabs.query({ active: true, currentWindow: true }, async (tabs) => {
-      if (tabs?.[0]?.url === message.url) {
+      if (stripArchivePrefix(tabs?.[0]?.url) === message.url) {
         for (let state of message.states) {
           await addToolbarState(tabs[0], state)
         }
@@ -640,7 +640,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       if (tabs?.[0]) {
         if (message.settings) {
           // clear 'R' state if wiki, amazon, or tvnews settings have been cleared
-          const news_host = new URL(tabs[0].url).hostname
+          const news_host = new URL(stripArchivePrefix(tabs[0].url)).hostname
           if (((message.settings.wiki_setting === false) && tabs[0].url.match(/^https?:\/\/[\w.]*wikipedia.org/)) ||
               ((message.settings.amazon_setting === false) && tabs[0].url.includes('www.amazon')) ||
               ((message.settings.tvnews_setting === false) && newshosts.has(news_host))) {
@@ -681,8 +681,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 })
 
 chrome.tabs.onUpdated.addListener(async (tabId, info, tab) => {
-  const url = tab.url
-  if (!(isNotExcludedUrl(url) && isValidUrl(url)) || !stripArchivePrefix(url)) { return }
+  const url = stripArchivePrefix(tab.url)
+  if (!(isNotExcludedUrl(url) && isValidUrl(url)) || isArchiveUrl(url)) { return }
 
   if (info.status === 'complete') {
     updateWaybackCountBadge(tab, url)
@@ -734,10 +734,10 @@ chrome.tabs.onUpdated.addListener(async (tabId, info, tab) => {
       }
     })
   } else if (info.status === 'loading') {
-    let received_url = url
+    let received_url = stripArchivePrefix(url)
     await clearToolbarState(tab)
 
-    if (received_url && stripArchivePrefix(received_url)) {
+    if (received_url && !isArchiveUrl(received_url)) {
       let open_url = received_url.replace(/^https?:\/\//, '')
       if (open_url.slice(-1) === '/') { open_url = received_url.substring(0, open_url.length - 1) }
 
@@ -804,12 +804,12 @@ chrome.tabs.onActivated.addListener((info) => {
       }
       // tvnews_setting settings unchecked
       if (settings?.tvnews_setting === false && tbStates.has('R')) {
-        const news_host = new URL(tab.url).hostname
+        const news_host = new URL(stripArchivePrefix(tab.url)).hostname
         if (newshosts.has(news_host)) { await removeToolbarState(tab, 'R') }
       }
       // clear '404 not found' dot if tab URL doesn't match stored URL
       let data = await readTabData(tab);
-      if (data?.statusUrl && (cropPrefix(data.statusUrl) !== cropPrefix(tab.url))) {
+      if (data?.statusUrl && (cropPrefix(data.statusUrl) !== cropPrefix(stripArchivePrefix(tab.url)))) {
         // TODO FIXME: stored data with statusCode: 999 and data.statusUrl doesn't match tab.url
         // since data is never cleared, this is called every time user switches to this tab.
         // Could check if has 'V' first? (tab id doesn't match the one in toolbar state) [FIXED]
@@ -982,7 +982,7 @@ function getCachedWaybackCount(url, onSuccess, onFail) {
     let waybackCountCache = result.waybackCountCache || {};
 
     // Check if cacheValues for the specified URL exist in the waybackCountCache
-    let cacheValues = waybackCountCache[url];
+    let cacheValues = waybackCountCache[stripArchivePrefix(url)];
 
     if (cacheValues) {
       // If cacheValues exist, call onSuccess callback with cacheValues
@@ -991,7 +991,7 @@ function getCachedWaybackCount(url, onSuccess, onFail) {
       // If cacheValues don't exist, fetch them using getWaybackCount
       getWaybackCount(url, function(values) {
         // Update waybackCountCache with the fetched values
-        waybackCountCache[url] = values;
+        waybackCountCache[stripArchivePrefix(url)] = values;
 
         // Store the updated waybackCountCache back into chrome.storage
         // TODO: Is this the most efficient way to store? Do objects take up too much space? [CG]
@@ -1044,17 +1044,17 @@ function incrementCount(url) {
     let timestamp = dateToTimestamp(new Date());
 
     // Get the cacheValues for the specified URL
-    let cacheValues = waybackCountCache[url];
+    let cacheValues = waybackCountCache[stripArchivePrefix(url)];
     if (cacheValues?.total) {
       if (cacheValues.total > 0) {
         cacheValues.total += 1;
         cacheValues.last_ts = timestamp;
-        waybackCountCache[url] = cacheValues;
+        waybackCountCache[stripArchivePrefix(url)] = cacheValues;
       }
       // else don't update if total is a special value < 0
     } else {
       // set total to 1 if it's a new URL
-      waybackCountCache[url] = { total: 1, last_ts: timestamp };
+      waybackCountCache[stripArchivePrefix(url)] = { total: 1, last_ts: timestamp };
     }
 
     // Store the updated waybackCountCache back into chrome.storage
@@ -1071,7 +1071,7 @@ function incrementCount(url) {
 function updateWaybackCountBadge(atab, url) {
   if (!atab) { return }
   chrome.storage.local.get(['wm_count_setting'], (settings) => {
-    if (settings?.wm_count_setting && isValidUrl(url) && isNotExcludedUrl(url) && stripArchivePrefix(url)) {
+    if (settings?.wm_count_setting && isValidUrl(url) && isNotExcludedUrl(url) && !isArchiveUrl(url)) {
       getCachedWaybackCount(url, async(values) => {
         let tbStates = await getToolbarState(atab);
         if ((values.total >= 0) && !tbStates.has('S')) {
@@ -1211,7 +1211,7 @@ function updateToolbar(atab, states) {
 chrome.contextMenus.onClicked.addListener((click) => {
   if (['first', 'recent', 'save', 'all'].indexOf(click.menuItemId) >= 0) {
     chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-      let url = click.linkUrl || tabs[0].url
+      let url = click.linkUrl || stripArchivePrefix(tabs[0].url)
       if (isValidUrl(url) && isNotExcludedUrl(url)) {
         let page_url = getCleanUrl(url)
         let wayback_url

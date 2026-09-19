@@ -323,7 +323,7 @@ function badgeCountText(count) {
  */
 function getWaybackCount(url, onSuccess, onFail) {
   if (isValidUrl(url) && isNotExcludedUrl(url)) {
-    const requestUrl = hostURL + '__wb/sparkline?collection=web&output=json&url=' + fixedEncodeURIComponent(url)
+    const requestUrl = hostURL + '__wb/sparkline?collection=web&output=json&url=' + fixedEncodeURIComponent(stripArchivePrefix(url))
     const timeoutPromise = new Promise((resolve, reject) => {
       setTimeout(() => {
         reject(new Error('timeout'))
@@ -361,7 +361,7 @@ function getWaybackCount(url, onSuccess, onFail) {
  * Checks Wayback Machine API for url snapshot
  */
 function wmAvailabilityCheck(url, onsuccess, onfail) {
-  const requestUrl = hostURL + 'wayback/available?url=' + fixedEncodeURIComponent(url)
+  const requestUrl = hostURL + 'wayback/available?url=' + fixedEncodeURIComponent(stripArchivePrefix(url))
   fetch(requestUrl, {
     method: 'GET',
     headers: hostHeaders
@@ -371,7 +371,7 @@ function wmAvailabilityCheck(url, onsuccess, onfail) {
     let wayback_url = getWaybackUrlFromResponse(json)
     let timestamp = getWaybackTimestampFromResponse(json)
     if (wayback_url !== null) {
-      onsuccess(wayback_url, url, timestamp)
+      onsuccess(wayback_url, stripArchivePrefix(url), timestamp)
     } else if (onfail) {
       onfail()
     }
@@ -401,18 +401,14 @@ function isArchiveUrl(url) {
 /**
  * Returns the URL without the archive prefix.
  * @param url {string}
- * @return {bool}
+ * @return {string}
  */
 function stripArchivePrefix(url) {
   if (isArchiveUrl(url)) {
-    try {
-      url = url.replace("^https?://web.archive.org/web/\d+\d{10}(?:_im)?/", "")
-    } catch (e) {
-      // cannot fetch the original url
-      return false
-    }
+    const newUrl = url.replace(/^https?:\/\/web\.archive\.org\/web\/\w*\//, "")
+    return newUrl
   }
-  return true
+  return url
 }
 
 /**
@@ -462,7 +458,7 @@ function cropScheme(url) {
 function isNotExcludedUrl(url) {
   if (typeof url !== 'string') { return false }
   if (url.trim() === '') { return false }
-  url = url.toLowerCase()
+  url = stripArchivePrefix(url.toLowerCase())
   for (let exUrl of excluded_urls) {
     exUrl = exUrl.toLowerCase()
     if (url.startsWith(exUrl) || url.startsWith('http://' + exUrl) || url.startsWith('https://' + exUrl)) {
@@ -515,7 +511,7 @@ function getCleanUrl(url) {
  * @return {string or null}
  */
 function getWaybackUrlFromResponse(json) {
-  const url = json?.archived_snapshots?.closest?.url
+  const url = stripArchivePrefix(json?.archived_snapshots?.closest?.url)
   const status = json?.archived_snapshots?.closest?.status
   const available = json?.archived_snapshots?.closest?.available
 
