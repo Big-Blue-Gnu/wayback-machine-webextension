@@ -8,8 +8,8 @@ if (typeof importScripts === 'function') {
 }
 
 // from 'utils.js'
-/*   global isNotExcludedUrl, getCleanUrl, isArchiveUrl, isValidUrl, notifyMsg, openByWindowSetting, sleep, wmAvailabilityCheck, hostURL */
-/*   global initDefaultOptions, badgeCountText, getWaybackCount, newshosts, dateToTimestamp, fixedEncodeURIComponent, checkLastError */
+/*   global isNotExcludedUrl, cropQuery, getCleanUrl, isArchiveUrl, isValidUrl, notifyMsg, openByWindowSetting, sleep, wmAvailabilityCheck */
+/*   global hostURL, initDefaultOptions, badgeCountText, getWaybackCount, newshosts, dateToTimestamp, fixedEncodeURIComponent, checkLastError */
 /*   global hostHeaders, timestampToDate, isBadgeOnTop, isUrlInList, saveTabData, clearTabData, readTabData, initAutoExcludeList */
 /*   global isDevVersion, checkAuthentication, setupContextMenus, cropPrefix, alertMsg */
 
@@ -699,7 +699,7 @@ chrome.tabs.onUpdated.addListener(async (tabId, info, tab) => {
             beforeDate = new Date(Date.now() - milisecs)
           }
         }
-        await autoSave(tab, url, beforeDate)
+        await autoSave(tab, cropQuery(url), beforeDate)
       }
 
       // 404 not found
@@ -885,7 +885,7 @@ function autoBookmarksListener(id, bookmark) {
           // This forces only 1 URL to be saved. Also prevents importing URLs from saving any.
           // Trying to solve multiple URLs would require a queue. Could open a Bulk Save window?
           if (tabs?.[0] && (tabs[0].url === bookmark.url)) {
-            autoSave(tabs[0], bookmark.url)
+            autoSave(tabs[0], cropQuery(bookmark.url))
           }
         })
       }
